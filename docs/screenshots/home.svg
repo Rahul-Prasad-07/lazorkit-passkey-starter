@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="100%" height="100%" fill="#0ea5a4" />
+  <text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="36" fill="#fff">Home screenshot placeholder</text>
+  <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="18" fill="#ffffffaa">Run `npm run screenshots` to generate a real screenshot</text>
+</svg>

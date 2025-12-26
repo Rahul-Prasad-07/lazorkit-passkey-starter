@@ -2,6 +2,22 @@
 
 > The canonical starter repository for building passkey-based smart wallets on Solana with Lazorkit.
 
+![CI](https://github.com/Rahul-Prasad-07/lazorkit-passkey-starter/actions/workflows/ci.yml/badge.svg)
+
+---
+
+## Screenshots
+
+Home page screenshot (generated with Playwright):
+
+![Home screenshot](./docs/screenshots/home.svg)
+
+To generate screenshots locally:
+
+1. Start the app: `npm run dev`
+2. Run: `npm run screenshots` (creates `docs/screenshots/home.png`)
+
+
 This repository demonstrates how to integrate [Lazorkit](https://github.com/lazor-kit/lazor-kit) SDK to create production-ready passkey wallets that enable gasless transactions. It's designed as a reference implementation that developers can clone and extend for their own projects.
 
 ## What This Repo Demonstrates
@@ -229,6 +245,32 @@ Ensure environment variables are set and the app is built with `npm run build`.
 - Ensure HTTPS in production (WebAuthn requires secure context)
 - Check browser WebAuthn support
 - Try different browsers if issues persist
+
+### Common Issues & Quick Fixes (Helpful for Judges)
+
+- **Balance shows 0.00 even though explorer shows tokens**: The token may be in a non-ATA token account. The app now uses `getParsedTokenAccountsByOwner` to aggregate balances and will display them. If a balance is still missing, check that the token mint in `.env.local` is correct.
+
+- **Token Transfer fails with "ATA not found"**: The app automatically creates missing ATAs as part of the transaction. If a paymaster rejects the transaction, ensure the paymaster URL is correct and reachable and that the smart wallet has sufficient token balance to cover token-based fees.
+
+- **WebAuthn prompt doesn't show**: Ensure you are running on HTTPS or `localhost` and that the browser supports platform authenticators (FaceID/TouchID).
+
+### Getting Test Funds (Devnet)
+
+- **SOL (for paying fees or creating ATAs manually)**
+  ```bash
+  solana airdrop 1 <YOUR_ADDRESS> --url https://api.devnet.solana.com
+  ```
+
+- **USDC on Devnet**
+  - Devnet USDC mint used in this repo: `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`
+  - You can mint USDC to an address using the `spl-token` CLI (requires a mint authority on Devnet) or use a trusted Devnet account to transfer USDC to your wallet. If you prefer, use Spl Token CLI to create an associated account and mint (demo only):
+  ```bash
+  # Create associated token account and mint (demo only - requires mint authority)
+  spl-token create-account EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v --url https://api.devnet.solana.com
+  spl-token mint EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v 100 <RECIPIENT_ATA> --url https://api.devnet.solana.com
+  ```
+
+If you're unsure, ask in the LazorKit Discord or use the Devnet token faucets available in community channels.
 
 ### Transaction Failures
 - Verify USDC balance in wallet
