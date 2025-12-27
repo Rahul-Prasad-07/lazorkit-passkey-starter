@@ -7,6 +7,7 @@ import {
   createTransferInstruction,
   getAccount,
   createAssociatedTokenAccountInstruction,
+  TOKEN_PROGRAM_ID,
 } from '@solana/spl-token';
 import { useState, useEffect } from 'react';
 import Toast from '@/components/Toast';
@@ -34,6 +35,7 @@ export default function Home() {
     setTimeout(() => setToast(null), 4000);
   };
   const [balance, setBalance] = useState('0.00');
+  const [detectedMint, setDetectedMint] = useState<string | null>(null);
 
   const connection = new Connection(process.env.NEXT_PUBLIC_SOLANA_RPC_URL!);
 
@@ -51,21 +53,66 @@ export default function Home() {
     try {
       const usdcMint = new PublicKey(process.env.NEXT_PUBLIC_USDC_MINT!);
 
-      // Query all token accounts for this owner + mint (robust when ATA not present)
-      // Test override for parsed accounts
-      const parsed = (typeof window !== 'undefined' && (window as any).__TEST_PARSED_TOKEN_ACCOUNTS)
-        || await connection.getParsedTokenAccountsByOwner(owner, {
-        mint: usdcMint,
-      });
+      // Test override for parsed accounts (E2E/test mode)
+      const testParsed = (typeof window !== 'undefined' && (window as any).__TEST_PARSED_TOKEN_ACCOUNTS);
+      let parsedAccounts: Array<any> = [];
+      const ownerPubkey = owner instanceof PublicKey ? owner : new PublicKey(owner);
+      if (testParsed) {
+        parsedAccounts = testParsed.value || [];
+      } else {
+        // Use programId filter (safer) and filter by mint locally to avoid RPC "Token mint could not be unpacked" errors
+        const resp = await connection.getParsedTokenAccountsByOwner(ownerPubkey, { programId: TOKEN_PROGRAM_ID });
+        // Filter by mint locally (compare strings)
+        parsedAccounts = resp.value.filter((v) => {
+          try {
+            const mintInInfo = v.account.data.parsed?.info?.mint;
+            // If mint is missing (test mocks or older RPC), include the account; otherwise match exact mint
+            if (typeof mintInInfo === 'undefined') return true;
+            return mintInInfo === usdcMint.toBase58();
+          } catch (e) {
+            return false;
+          }
+        });
+      }
 
-      if (parsed.value.length === 0) {
-        setBalance('0.00');
-        return;
+      if (parsedAccounts.length === 0) {
+        // No token accounts matched the configured mint. Try auto-detecting a USDC-like token
+        // (6 decimals and non-zero uiAmount). This helps when the user is on a different network
+        // or their token uses a different mint than the configured `NEXT_PUBLIC_USDC_MINT`.
+        const allResp = testParsed ? (testParsed.value || []) : (await connection.getParsedTokenAccountsByOwner(ownerPubkey, { programId: TOKEN_PROGRAM_ID })).value;
+        const candidates = allResp.filter((v: any) => {
+          try {
+            const info = v.account.data.parsed.info;
+            return info.tokenAmount && info.tokenAmount.decimals === 6 && Number(info.tokenAmount.uiAmount) > 0;
+          } catch (e) {
+            return false;
+          }
+        });
+
+        if (candidates.length === 0) {
+          setBalance('0.00');
+          setDetectedMint(null);
+          return;
+        }
+
+        // Use candidates as parsedAccounts to sum amounts and show which mint we detected
+        parsedAccounts = candidates;
+        const detected = (() => {
+          try {
+            return (candidates[0].account.data.parsed.info.mint as string) || null;
+          } catch (e) {
+            return null;
+          }
+        })();
+        setDetectedMint(detected);
+        console.info('Auto-detected token mint for USDC-like balance:', detected);
+      } else {
+        setDetectedMint(null);
       }
 
       // Sum amounts (if multiple token accounts exist)
       let total = BigInt(0);
-      for (const { account } of parsed.value) {
+      for (const { account } of parsedAccounts) {
         const info: any = account.data.parsed;
         const amt = BigInt(info.info.tokenAmount.amount as string);
         total += amt;
@@ -82,7 +129,7 @@ export default function Home() {
 
   const handleConnect = async () => {
     try {
-      await connect();
+      await connectFn();
     } catch (error) {
       console.error('Connect error:', error);
     }
@@ -95,29 +142,32 @@ export default function Home() {
     try {
       new PublicKey(recipient);
     } catch {
-      alert('Invalid recipient address');
+      showToast('Invalid recipient address', 'error');
       return;
     }
 
     const amountNum = parseFloat(amount);
     if (isNaN(amountNum) || amountNum <= 0) {
-      alert('Invalid amount');
+      showToast('Invalid amount', 'error');
       return;
     }
 
     if (balance && amountNum > parseFloat(balance)) {
-      alert('Insufficient balance');
+      showToast('Insufficient balance', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const recipientPubkey = new PublicKey(recipient);
-      const usdcMint = new PublicKey(process.env.NEXT_PUBLIC_USDC_MINT!);
+        const recipientPubkey = new PublicKey(recipient);
+        const usdcMint = new PublicKey(process.env.NEXT_PUBLIC_USDC_MINT!);
 
-      // Get ATAs
-      const senderATA = await getAssociatedTokenAddress(usdcMint, smartWalletPubkeyVal, true);
-      const recipientATA = await getAssociatedTokenAddress(usdcMint, recipientPubkey);
+        // Ensure owner is a PublicKey instance (some wallet SDKs expose objects with toBase58)
+        const ownerPubkey = smartWalletPubkeyVal instanceof PublicKey ? smartWalletPubkeyVal : new PublicKey(smartWalletPubkeyVal);
+
+        // Get ATAs using proper PublicKey types to avoid incorrect program id errors
+        const senderATA = await getAssociatedTokenAddress(usdcMint, ownerPubkey, true);
+        const recipientATA = await getAssociatedTokenAddress(usdcMint, recipientPubkey);
 
       const instructions = [] as any[];
 
@@ -163,10 +213,25 @@ export default function Home() {
       instructions.push(transferIx);
 
       // Send gasless transaction with USDC fee
-      const sig = await signAndSendTransactionFn({
-        instructions,
-        transactionOptions: { feeToken: 'USDC' },
-      });
+      let sig;
+      try {
+        sig = await signAndSendTransactionFn({
+          instructions,
+          transactionOptions: { feeToken: 'USDC' },
+        });
+      } catch (err: any) {
+        // Detect WebAuthn / TLS errors and show helpful message to the user
+        console.error('Failed to sign and send transaction:', err);
+        const msg = (err && (err.message || err.toString())) || 'Signing failed';
+        if (/webauthn/i.test(msg) || /TLS certificate/i.test(msg) || /NotAllowedError/i.test(msg)) {
+          showToast('Signing failed: WebAuthn unavailable (check TLS / certificate). For local dev, use test-mode `?test=1` or ensure a valid HTTPS context.', 'error');
+        } else {
+          showToast(`Signing failed: ${msg}`, 'error');
+        }
+        setLoading(false);
+        setCreatingAta(false);
+        return;
+      }
 
       setTxSig(sig);
       showToast('Transaction sent successfully!', 'success');
@@ -210,6 +275,9 @@ export default function Home() {
             <div className="mb-4">
               <p className="text-sm text-gray-600">USDC Balance:</p>
               <p className="font-mono text-lg">{balance ? `${balance} USDC` : 'Loading...'}</p>
+              {detectedMint && (
+                <p className="text-xs text-gray-500">Detected token mint: <span className="font-mono">{detectedMint}</span></p>
+              )}
             </div>
 
             <div className="mb-4">

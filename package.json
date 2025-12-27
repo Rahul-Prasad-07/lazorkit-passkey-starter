@@ -8,13 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
-    "test:watch": "jest --watch",
-    "test:e2e": "npx playwright install --with-deps && npx wait-on http://localhost:3000 --timeout 120000 && npx playwright test",
-    "screenshots": "node scripts/capture-screenshots.js"
+    "test:watch": "jest --watch"
   },
   "devDependencies": {
-    "@playwright/test": "^1.57.0",
-    "wait-on": "^7.0.1",
+    
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",

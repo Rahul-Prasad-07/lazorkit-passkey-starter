@@ -2,20 +2,7 @@
 
 > The canonical starter repository for building passkey-based smart wallets on Solana with Lazorkit.
 
-![CI](https://github.com/Rahul-Prasad-07/lazorkit-passkey-starter/actions/workflows/ci.yml/badge.svg)
 
----
-
-## Screenshots
-
-Home page screenshot (generated with Playwright):
-
-![Home screenshot](./docs/screenshots/home.svg)
-
-To generate screenshots locally:
-
-1. Start the app: `npm run dev`
-2. Run: `npm run screenshots` (creates `docs/screenshots/home.png`)
 
 
 This repository demonstrates how to integrate [Lazorkit](https://github.com/lazor-kit/lazor-kit) SDK to create production-ready passkey wallets that enable gasless transactions. It's designed as a reference implementation that developers can clone and extend for their own projects.
