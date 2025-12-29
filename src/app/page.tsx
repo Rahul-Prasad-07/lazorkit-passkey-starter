@@ -264,6 +264,16 @@ export default function Home() {
             >
               Create Passkey Wallet
             </button>
+            
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-sm text-gray-600 mb-3">Explore Examples:</p>
+              <a
+                href="/sign-message"
+                className="block w-full bg-purple-100 text-purple-700 py-2 px-4 rounded-lg hover:bg-purple-200 transition-colors text-center text-sm font-medium"
+              >
+                🔐 Message Signing Demo
+              </a>
+            </div>
           </div>
         ) : (
           <div>
@@ -338,16 +348,25 @@ export default function Home() {
             {/* Toast */}
             {toast && <Toast message={toast.message} type={toast.type} />}
 
-            <button
-              onClick={() => {
-                disconnectFn();
-                setTxSig('');
-                setBalance('0.00');
-              }}
-              className="w-full mt-4 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Disconnect
-            </button>
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-sm text-gray-600 mb-3">Explore More:</p>
+              <a
+                href="/sign-message"
+                className="block w-full bg-purple-100 text-purple-700 py-2 px-4 rounded-lg hover:bg-purple-200 transition-colors text-center text-sm font-medium mb-3"
+              >
+                🔐 Message Signing Demo
+              </a>
+              <button
+                onClick={() => {
+                  disconnectFn();
+                  setTxSig('');
+                  setBalance('0.00');
+                }}
+                className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Disconnect
+              </button>
+            </div>
           </div>
         )}
       </div>
